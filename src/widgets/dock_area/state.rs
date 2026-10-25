@@ -40,7 +40,10 @@ impl State {
         ctx: &Context,
         style: &Style,
     ) {
-        if !self.is_drag_drop_locked(ctx, style) {
+        // An edge zone is decided by the pointer alone: the lock that holds a
+        // leaf as the target for a while after the pointer leaves it does not
+        // outrank a strip the pointer now rests in.
+        if drop.edge.is_some() || !self.is_drag_drop_locked(ctx, style) {
             self.dnd = Some(DragDropState {
                 hover: drop,
                 drag,

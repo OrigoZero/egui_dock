@@ -1,14 +1,18 @@
 use duplicate::duplicate;
 use egui::{
-    CentralPanel, Color32, Context, CornerRadius, CursorIcon, EventFilter, Frame, Key, Pos2, Rect,
+    pos2, CentralPanel, Color32, Context, CornerRadius, CursorIcon, EventFilter, Frame, Key, Pos2, Rect,
     Sense, StrokeKind, Ui, Vec2,
 };
 use paste::paste;
 
-use super::{drag_and_drop::TreeComponent, state::State, tab_removal::TabRemoval};
+use super::{
+    drag_and_drop::{HoverData, TreeComponent, EDGE_DOCK_FRACTION},
+    state::State,
+    tab_removal::TabRemoval,
+};
 use crate::dock_area::tab_removal::ForcedRemoval;
 use crate::tab_viewer::OnCloseResponse;
-use crate::NodePath;
+use crate::{NodePath, Split};
 use crate::{
     utils::{expand_to_pixel, fade_dock_style, map_to_pixel},
     AllowedSplits, DockArea, Node, NodeIndex, OverlayType, Style, SurfaceIndex, TabDestination,
@@ -69,6 +73,16 @@ impl<Tab> DockArea<'_, Tab> {
             )
         });
 
+        // Editor patch: the main surface's outer edges are drop zones of
+        // their own. A drag that rests in one docks the tab against that edge
+        // of the WHOLE surface — the root node splits — so a region that was
+        // emptied can be docked back to from a bare edge, where no leaf
+        // offers a zone. It outranks whatever leaf lies under the strip.
+        let hover_data = match (&drag_data, state.last_hover_pos) {
+            (Some(_), Some(pointer)) => self.root_edge_hover(pointer).or(hover_data),
+            _ => hover_data,
+        };
+
         let released = ui.input(|i| i.pointer.primary_released());
         if let Some(source) = drag_data {
             if let Some(hover) = hover_data {
@@ -85,7 +99,23 @@ impl<Tab> DockArea<'_, Tab> {
                                 ),
                             }
                         };
+                        let edge = state.dnd.as_ref().and_then(|dnd| dnd.hover.edge);
                         self.dock_state.move_tab(source, destination);
+                        // An edge dock split the root: the new region takes
+                        // the share the overlay previewed. The new leaf is
+                        // the first child of a Left or Above split and the
+                        // second of a Right or Below one.
+                        if let Some(split) = edge {
+                            let share = match split {
+                                Split::Left | Split::Above => EDGE_DOCK_FRACTION,
+                                Split::Right | Split::Below => 1.0 - EDGE_DOCK_FRACTION,
+                            };
+                            if let Some(Node::Horizontal(node) | Node::Vertical(node)) =
+                                self.dock_state.main_surface_mut().root_node_mut()
+                            {
+                                node.fraction = share;
+                            }
+                        }
                     }
                 }
             } else if released {
@@ -214,6 +244,49 @@ impl<Tab> DockArea<'_, Tab> {
         }
 
         state.store(ui.ctx(), self.id);
+    }
+
+    /// The hover an edge zone of the main surface produces for `pointer`, or
+    /// `None` when the pointer is not in one.
+    ///
+    /// A zone is a strip along one outer edge of the root node's rect. The
+    /// hover names the root node and the split that docks against that edge,
+    /// and its rect is the region the split would create, so the overlay
+    /// shows where the tab lands.
+    fn root_edge_hover(&self, pointer: Pos2) -> Option<HoverData> {
+        const ZONE: f32 = 22.0;
+        const PREVIEW: f32 = EDGE_DOCK_FRACTION;
+        let tree = self.dock_state.main_surface();
+        if tree.is_empty() {
+            return None;
+        }
+        let rect = tree.root_node()?.rect()?;
+        if !rect.contains(pointer) {
+            return None;
+        }
+        let left = pointer.x - rect.min.x;
+        let right = rect.max.x - pointer.x;
+        let top = pointer.y - rect.min.y;
+        let bottom = rect.max.y - pointer.y;
+        let nearest = left.min(right).min(top).min(bottom);
+        if nearest > ZONE {
+            return None;
+        }
+        let (split, region) = if nearest == left {
+            (Split::Left, Rect::from_min_max(rect.min, pos2(rect.min.x + rect.width() * PREVIEW, rect.max.y)))
+        } else if nearest == right {
+            (Split::Right, Rect::from_min_max(pos2(rect.max.x - rect.width() * PREVIEW, rect.min.y), rect.max))
+        } else if nearest == top {
+            (Split::Above, Rect::from_min_max(rect.min, pos2(rect.max.x, rect.min.y + rect.height() * PREVIEW)))
+        } else {
+            (Split::Below, Rect::from_min_max(pos2(rect.min.x, rect.max.y - rect.height() * PREVIEW), rect.max))
+        };
+        Some(HoverData {
+            rect: region,
+            dst: TreeComponent::Node(NodePath::MAIN_ROOT),
+            tab: None,
+            edge: Some(split),
+        })
     }
 
     /// Returns some when windows are fading, and what surface index is being hovered over

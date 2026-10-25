@@ -324,8 +324,18 @@ impl<Tab> DockState<Tab> {
                 self[dst_surface] = Tree::new(vec![tab])
             }
         }
-        if self[src.node_path()].is_leaf() && self[src.node_path()].tabs_count() == 0 {
-            self[src.surface].remove_leaf(src.node);
+        // The leaf the tab left, found by what it is rather than by where it
+        // was: a split of an ancestor of the source moves every node under
+        // it to a new index, so the source's path names another node once a
+        // root split has run. No leaf was empty before the move, so the one
+        // with no tabs is the vacated one.
+        let vacated = self[src.surface]
+            .iter()
+            .enumerate()
+            .find(|(_, node)| node.is_leaf() && node.tabs_count() == 0)
+            .map(|(index, _)| NodeIndex(index));
+        if let Some(node) = vacated {
+            self[src.surface].remove_leaf(node);
         }
         if self[src.surface].is_empty() && !src.surface.is_main() {
             self.remove_surface(src.surface);

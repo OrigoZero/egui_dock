@@ -944,11 +944,28 @@ impl<Tab> DockArea<'_, Tab> {
         fade: Option<&Style>,
     ) -> (Response, Option<Response>) {
         let style = fade.unwrap_or_else(|| self.style.as_ref().unwrap());
+        // Whole-TabStyle knobs, taken before the per-interaction shadowing below.
+        let title_text_size = tab_style.text_size;
+        let active_underline = tab_style.active_underline;
+        // An explicit title size overrides the Button text style's. A LayoutJob
+        // or Galley title carries its own per-section formatting (a tab badge)
+        // and passes through untouched.
+        let label = match title_text_size {
+            Some(size)
+                if !matches!(
+                    label,
+                    egui::WidgetText::LayoutJob(_) | egui::WidgetText::Galley(_)
+                ) =>
+            {
+                egui::RichText::new(label.text()).size(size).into()
+            }
+            _ => label,
+        };
         let galley = label.into_galley(ui, None, f32::INFINITY, TextStyle::Button);
         let x_spacing = 8.0;
         let text_width = galley.size().x + 2.0 * x_spacing;
         let close_button_size = if show_close_button {
-            Style::TAB_CLOSE_BUTTON_SIZE.min(style.tab_bar.height)
+            style.buttons.close_tab_button_size.min(style.tab_bar.height)
         } else {
             0.0
         };
@@ -1019,6 +1036,18 @@ impl<Tab> DockArea<'_, Tab> {
         ui.painter()
             .add(TextShape::new(text_pos, galley, tab_style.text_color));
 
+        // The active tab's accent underline, along the bottom edge of the tab.
+        if active && active_underline != Stroke::NONE {
+            let y = tab_rect.bottom() - active_underline.width * 0.5;
+            ui.painter().line_segment(
+                [
+                    egui::pos2(tab_rect.left() + x_spacing * 0.5, y),
+                    egui::pos2(tab_rect.right() - x_spacing * 0.5, y),
+                ],
+                active_underline,
+            );
+        }
+
         let close_response = show_close_button.then(|| {
             let mut close_button_rect = tab_rect;
             close_button_rect.set_left(text_rect.right());
@@ -1048,7 +1077,7 @@ impl<Tab> DockArea<'_, Tab> {
             }
 
             let mut x_rect = close_button_rect;
-            rect_set_size_centered(&mut x_rect, Vec2::splat(Style::TAB_CLOSE_X_SIZE));
+            rect_set_size_centered(&mut x_rect, Vec2::splat(style.buttons.close_tab_x_size));
             ui.painter().line_segment(
                 [x_rect.left_top(), x_rect.right_bottom()],
                 Stroke::new(1.0_f32, color),
@@ -1306,7 +1335,7 @@ impl<Tab> DockArea<'_, Tab> {
                 ui.memory_mut(|mem| {
                     mem.data.insert_temp(
                         self.id.with("hover_data"),
-                        Some(HoverData { rect, dst, tab }),
+                        Some(HoverData { rect, dst, tab, edge: None }),
                     );
                 });
             }

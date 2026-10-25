@@ -67,6 +67,12 @@ pub struct Style {
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct ButtonsStyle {
+    /// Side length of the close-tab button's interact box. By `Default` it's `24.0`.
+    pub close_tab_button_size: f32,
+
+    /// Side length of the close-tab X glyph. By `Default` it's `9.0`.
+    pub close_tab_x_size: f32,
+
     /// Color of the close tab button.
     pub close_tab_color: Color32,
 
@@ -225,6 +231,13 @@ pub struct TabStyle {
     /// The tab title or [`TabBarStyle::fill_tab_bar`] may make the tab
     /// wider than this but never shorter.
     pub minimum_width: Option<f32>,
+
+    /// Font size for tab title text. `None` uses the egui `Button` text style.
+    pub text_size: Option<f32>,
+
+    /// Accent line drawn along the bottom edge of the ACTIVE tab (the
+    /// underline treatment). [`Stroke::NONE`] draws nothing.
+    pub active_underline: Stroke,
 }
 
 /// Specifies the look and feel of individual tabs while they are being interacted with.
@@ -369,6 +382,8 @@ impl Default for Style {
 impl Default for ButtonsStyle {
     fn default() -> Self {
         Self {
+            close_tab_button_size: 24.0,
+            close_tab_x_size: 9.0,
             close_tab_color: Color32::WHITE,
             close_tab_active_color: Color32::WHITE,
             close_tab_bg_fill: Color32::GRAY,
@@ -454,6 +469,8 @@ impl Default for TabStyle {
             tab_body: TabBodyStyle::default(),
             hline_below_active_tab_name: false,
             minimum_width: None,
+            text_size: None,
+            active_underline: Stroke::NONE,
         }
     }
 }
@@ -525,8 +542,6 @@ impl Default for LeafHighlighting {
 impl Style {
     pub(crate) const TAB_ADD_BUTTON_SIZE: f32 = 24.0;
     pub(crate) const TAB_ADD_PLUS_SIZE: f32 = 12.0;
-    pub(crate) const TAB_CLOSE_BUTTON_SIZE: f32 = 24.0;
-    pub(crate) const TAB_CLOSE_X_SIZE: f32 = 9.0;
     pub(crate) const TAB_CLOSE_ALL_BUTTON_SIZE: f32 = 24.0;
     pub(crate) const TAB_CLOSE_ALL_SIZE: f32 = 10.0;
     pub(crate) const TAB_COLLAPSE_BUTTON_SIZE: f32 = 24.0;

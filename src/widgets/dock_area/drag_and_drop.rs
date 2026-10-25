@@ -20,7 +20,17 @@ pub(super) struct HoverData {
 
     /// If a tab title or the tab head is hovered, this is the rect of it.
     pub tab: Option<Rect>,
+
+    /// Set when the pointer rests in one of the main surface's outer edge
+    /// zones: the split that docks the dragged tab against that edge of the
+    /// whole surface, splitting the root node. `dst` is the root.
+    pub edge: Option<Split>,
 }
+
+/// The share of the main surface a tab docked against one of its edges
+/// takes: the region the overlay previews, and the fraction the new root
+/// split is left at.
+pub(super) const EDGE_DOCK_FRACTION: f32 = 0.25;
 
 /// Specifies the location of a tab on the tree, used when moving tabs.
 #[derive(Debug, Clone)]
@@ -182,6 +192,28 @@ impl DragDropState {
     ) -> Option<TabDestination> {
         assert!(!self.is_on_title_bar());
 
+        // An edge zone names its split outright: the dragged tab docks
+        // against that edge of the whole surface, so the root node splits.
+        // Nothing else about the hovered leaf applies.
+        if let Some(split) = self.hover.edge {
+            let allowed = match allowed_splits {
+                AllowedSplits::All => true,
+                AllowedSplits::LeftRightOnly => split.is_left_right(),
+                AllowedSplits::TopBottomOnly => split.is_top_bottom(),
+                AllowedSplits::None => false,
+            };
+            if !allowed {
+                self.update_lock(LockState::Unlocked, style, ui.ctx());
+                return None;
+            }
+            draw_drop_rect(self.hover.rect, ui, style);
+            self.update_lock(LockState::SoftLock, style, ui.ctx());
+            return match self.hover.dst {
+                TreeComponent::Node(path) => Some(TabDestination::Node(path, TabInsert::Split(split))),
+                _ => None,
+            };
+        }
+
         draw_highlight_rect(self.hover.rect, ui, style);
         let mut hovering_buttons = false;
         let total_button_spacing = style.overlay.button_spacing * 2.0;
@@ -269,6 +301,28 @@ impl DragDropState {
         if !windows_allowed && self.hover.dst.surface_address() != SurfaceIndex::main() {
             return None;
         }
+        // An edge zone names its split outright: the dragged tab docks
+        // against that edge of the whole surface, so the root node splits.
+        // Nothing else about the hovered leaf applies.
+        if let Some(split) = self.hover.edge {
+            let allowed = match allowed_splits {
+                AllowedSplits::All => true,
+                AllowedSplits::LeftRightOnly => split.is_left_right(),
+                AllowedSplits::TopBottomOnly => split.is_top_bottom(),
+                AllowedSplits::None => false,
+            };
+            if !allowed {
+                self.update_lock(LockState::Unlocked, style, ui.ctx());
+                return None;
+            }
+            draw_drop_rect(self.hover.rect, ui, style);
+            self.update_lock(LockState::SoftLock, style, ui.ctx());
+            return match self.hover.dst {
+                TreeComponent::Node(path) => Some(TabDestination::Node(path, TabInsert::Split(split))),
+                _ => None,
+            };
+        }
+
         draw_highlight_rect(self.hover.rect, ui, style);
 
         // Deals with hovers over tab bar and tab titles.
