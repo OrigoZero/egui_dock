@@ -1,5 +1,5 @@
 /// Groups together labels from different elements of the [`DockArea`](crate::DockArea).
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Translations {
     /// Text overrides for buttons in tab context menus.
@@ -9,7 +9,7 @@ pub struct Translations {
 }
 
 /// Specifies text in buttons displayed in the context menu displayed upon right-clicking on a tab.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct TabContextMenuTranslations {
     /// Button that closes the tab.
@@ -19,7 +19,7 @@ pub struct TabContextMenuTranslations {
 }
 
 /// Specifies text displayed in the primary buttons on a tab bar.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct LeafTranslations {
     /// Message in the tooltip shown while hovering over a grayed out X button of a leaf
