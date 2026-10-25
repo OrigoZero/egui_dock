@@ -69,21 +69,50 @@ impl<Tab> DockArea<'_, Tab> {
             )
         });
 
-        if let (Some(source), Some(hover)) = (drag_data, hover_data) {
-            let style = self.style.as_ref().unwrap();
-            state.set_drag_and_drop(source, hover, ui.ctx(), style);
-            let tab_dst = self.show_drag_drop_overlay(ui, &mut state, tab_viewer);
-            if ui.input(|i| i.pointer.primary_released()) {
-                if let Some(destination) = tab_dst {
-                    let source = {
-                        match state.dnd.as_ref().unwrap().drag.src {
-                            TreeComponent::Tab(src) => src,
-                            _ => todo!(
-                                "collections of tabs, like nodes and surfaces can't be docked (yet)"
-                            ),
-                        }
+        let released = ui.input(|i| i.pointer.primary_released());
+        if let Some(source) = drag_data {
+            if let Some(hover) = hover_data {
+                let style = self.style.as_ref().unwrap();
+                state.set_drag_and_drop(source, hover, ui.ctx(), style);
+                let tab_dst = self.show_drag_drop_overlay(ui, &mut state, tab_viewer);
+                if released {
+                    if let Some(destination) = tab_dst {
+                        let source = {
+                            match state.dnd.as_ref().unwrap().drag.src {
+                                TreeComponent::Tab(src) => src,
+                                _ => todo!(
+                                    "collections of tabs, like nodes and surfaces can't be docked (yet)"
+                                ),
+                            }
+                        };
+                        self.dock_state.move_tab(source, destination);
+                    }
+                }
+            } else if released {
+                // Editor patch: released while hovering NOTHING (the bare
+                // backdrop, no window/leaf/surface under the pointer) tears the
+                // tab out into its own new window at the pointer. egui_dock
+                // otherwise produces no destination when there's no hover target,
+                // so the drag is dropped and the tab snaps back — which makes
+                // "drag to empty space = new window" impossible for a
+                // floating-panel shell. Only honoured when the tab allows
+                // windows. (This is the inverse of a dock target: no-hover IS
+                // the signal, not a synthetic main-surface hover.)
+                if let TreeComponent::Tab(src) = source.src {
+                    let allowed = if let Node::Leaf(leaf) = &mut self.dock_state[src.node_path()] {
+                        tab_viewer.allowed_in_windows(&mut leaf.tabs[src.tab.0])
+                    } else {
+                        false
                     };
-                    self.dock_state.move_tab(source, destination);
+                    if allowed {
+                        let pos = state
+                            .last_hover_pos
+                            .or_else(|| ui.input(|i| i.pointer.interact_pos()))
+                            .unwrap_or_else(|| self.window_bounds.unwrap().center());
+                        let size = Vec2::new(480.0, 360.0);
+                        self.dock_state
+                            .move_tab(src, TabDestination::Window(Rect::from_min_size(pos, size)));
+                    }
                 }
             }
         }

@@ -202,6 +202,11 @@ impl DragDropState {
                 TreeComponent::Node(path) => {
                     destination = Some(TabDestination::Node(path, TabInsert::Append))
                 }
+                // Editor patch: the empty MAIN surface stays a window-spawn
+                // backdrop — keep the Window default rather than docking into
+                // it. (See resolve_traditional for the rationale.) Other
+                // surfaces dock normally.
+                TreeComponent::Surface(surface) if surface.is_main() && windows_allowed => (),
                 TreeComponent::Surface(surface) => {
                     destination = Some(TabDestination::EmptySurface(surface))
                 }
