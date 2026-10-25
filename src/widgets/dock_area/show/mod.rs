@@ -661,12 +661,20 @@ impl<Tab> DockArea<'_, Tab> {
                 // Update 'fraction' interaction after drawing separator,
                 // otherwise it may overlap on other separator / bodies when
                 // shrunk fast.
+                //
+                // Editor patch: `style.separator.extra` bounds how close a
+                // DRAG may bring a separator to either end of the node it
+                // splits, so the clamp it produces applies to the fraction a
+                // drag arrives at. `extra` is a fixed length, so the share it
+                // bounds out of a node grows as that node shortens; the stored
+                // fraction is the arrangement itself, and a frame that moved
+                // no separator leaves it where it stands.
                 let range = rect.max.dim_point - rect.min.dim_point;
-                if range > 0.0 {
+                let delta = arrow_key_offset.unwrap_or(response.drag_delta()).dim_point;
+                if range > 0.0 && delta != 0.0 {
                     let min = (style.separator.extra / range).min(1.0);
                     let max = 1.0 - min;
                     let (min, max) = (min.min(max), max.max(min));
-                    let delta = arrow_key_offset.unwrap_or(response.drag_delta()).dim_point;
                     split.fraction = (split.fraction + delta / range).clamp(min, max);
                 }
 
