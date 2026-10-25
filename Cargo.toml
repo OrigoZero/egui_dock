@@ -33,6 +33,7 @@ eframe = { version = "0.34", default-features = false, features = [
     "glow",
 ] }
 serde_json = { version = "1" }
+wasm-bindgen-test = "0.3.72"
 
 [[example]]
 name = "save_load_dock_state"

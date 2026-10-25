@@ -753,7 +753,7 @@ where
 mod test {
     use super::*;
 
-    #[test]
+    #[wasm_bindgen_test::wasm_bindgen_test(unsupported = test)]
     fn retain_none_then_push() {
         let mut t = DockState::new(vec![]);
         t.push_to_focused_leaf(0);
