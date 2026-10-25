@@ -984,7 +984,7 @@ mod test {
     struct Tab(u64);
 
     /// Checks that `retain` works after removing a node
-    #[test]
+    #[wasm_bindgen_test::wasm_bindgen_test(unsupported = test)]
     fn remove_and_retain() {
         let mut tree: Tree<Tab> = Tree::new(vec![]);
         tree.push_to_focused_leaf(Tab(0));
@@ -1000,7 +1000,7 @@ mod test {
     }
 
     /// Tests whether `retain_tabs` works correctly with trailing `Empty` nodes
-    #[test]
+    #[wasm_bindgen_test::wasm_bindgen_test(unsupported = test)]
     fn retain_trailing_empty() {
         let mut tree: Tree<Tab> = Tree::new(vec![]);
         tree.push_to_focused_leaf(Tab(0));

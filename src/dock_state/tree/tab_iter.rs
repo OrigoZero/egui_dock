@@ -48,7 +48,8 @@ impl<Tab> std::fmt::Debug for TabIter<'_, Tab> {
     }
 }
 
-#[test]
+#[cfg(test)]
+#[wasm_bindgen_test::wasm_bindgen_test(unsupported = test)]
 fn test_tabs_iter() {
     fn tabs(tree: &Tree<i32>) -> Vec<i32> {
         tree.tabs().copied().collect()

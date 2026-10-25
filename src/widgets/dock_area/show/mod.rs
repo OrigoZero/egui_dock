@@ -77,9 +77,12 @@ impl<Tab> DockArea<'_, Tab> {
         // their own. A drag that rests in one docks the tab against that edge
         // of the WHOLE surface — the root node splits — so a region that was
         // emptied can be docked back to from a bare edge, where no leaf
-        // offers a zone. It outranks whatever leaf lies under the strip.
+        // offers a zone. It outranks the body of whatever leaf lies under the
+        // strip; a tab bar under the pointer keeps its drop, since a tab bar
+        // along the top or the side of the surface lies inside the strip and
+        // a drop on it names that node.
         let hover_data = match (&drag_data, state.last_hover_pos) {
-            (Some(_), Some(pointer)) => self.root_edge_hover(pointer).or(hover_data),
+            (Some(_), Some(pointer)) => merge_edge_hover(self.root_edge_hover(pointer), hover_data),
             _ => hover_data,
         };
 
@@ -672,5 +675,60 @@ impl<Tab> DockArea<'_, Tab> {
                 }
             }
         }
+    }
+}
+
+/// The hover a drag resolves against when the pointer may rest in an edge
+/// zone: the leaf's when its tab bar is under the pointer, else the edge
+/// zone's when the pointer is in one, else the leaf's.
+fn merge_edge_hover(edge: Option<HoverData>, leaf: Option<HoverData>) -> Option<HoverData> {
+    match leaf {
+        Some(hover) if hover.tab.is_some() => Some(hover),
+        leaf => edge.or(leaf),
+    }
+}
+
+#[cfg(test)]
+mod edge_hover_tests {
+    use super::*;
+    use crate::NodePath;
+
+    fn leaf(tab: Option<Rect>) -> HoverData {
+        HoverData {
+            rect: Rect::from_min_max(Pos2::ZERO, Pos2::new(100.0, 100.0)),
+            dst: TreeComponent::Node(NodePath::MAIN_ROOT),
+            tab,
+            edge: None,
+        }
+    }
+
+    fn edge() -> HoverData {
+        HoverData {
+            rect: Rect::from_min_max(Pos2::ZERO, Pos2::new(400.0, 25.0)),
+            dst: TreeComponent::Node(NodePath::MAIN_ROOT),
+            tab: None,
+            edge: Some(Split::Above),
+        }
+    }
+
+    #[wasm_bindgen_test::wasm_bindgen_test(unsupported = test)]
+    fn a_tab_bar_under_the_pointer_keeps_its_drop_inside_the_edge_strip() {
+        let bar = Rect::from_min_max(Pos2::ZERO, Pos2::new(100.0, 22.0));
+        let merged = merge_edge_hover(Some(edge()), Some(leaf(Some(bar)))).unwrap();
+        assert!(merged.edge.is_none());
+        assert_eq!(merged.tab, Some(bar));
+    }
+
+    #[wasm_bindgen_test::wasm_bindgen_test(unsupported = test)]
+    fn a_leaf_body_inside_the_strip_yields_to_the_edge_dock() {
+        let merged = merge_edge_hover(Some(edge()), Some(leaf(None))).unwrap();
+        assert_eq!(merged.edge, Some(Split::Above));
+    }
+
+    #[wasm_bindgen_test::wasm_bindgen_test(unsupported = test)]
+    fn outside_the_strip_the_leaf_stands() {
+        let merged = merge_edge_hover(None, Some(leaf(None))).unwrap();
+        assert!(merged.edge.is_none());
+        assert!(merge_edge_hover(None, None).is_none());
     }
 }
